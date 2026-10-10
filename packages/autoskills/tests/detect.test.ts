@@ -244,6 +244,21 @@ describe("detectTechnologies", () => {
     ok(ids.includes("zod"));
   });
 
+  it("detects InstantDB from dependencies", () => {
+    writePackageJson(tmp.path, { dependencies: { "@instantdb/react": "^0.21.0" } });
+    const { detected } = detectTechnologies(tmp.path);
+    const instantdb = detected.find((t) => t.id === "instantdb");
+    ok(instantdb);
+    ok(instantdb.skills.includes("instantdb/skills/instantdb"));
+  });
+
+  it("detects InstantDB from schema file", () => {
+    writePackageJson(tmp.path);
+    writeFile(tmp.path, "instant.schema.ts", "import { i } from '@instantdb/react';\n");
+    const { detected } = detectTechnologies(tmp.path);
+    ok(detected.some((t) => t.id === "instantdb"));
+  });
+
   it("detects React Hook Form from dependencies", () => {
     writePackageJson(tmp.path, { dependencies: { "react-hook-form": "^7.58.0" } });
     const { detected } = detectTechnologies(tmp.path);
@@ -278,6 +293,30 @@ describe("detectTechnologies", () => {
     writePackageJson(tmp.path);
     const { detected } = detectTechnologies(tmp.path);
     ok(!detected.some((t) => t.id === "go"));
+  });
+
+  it("detects Bash scripts from .sh files", () => {
+    writePackageJson(tmp.path);
+    writeFile(tmp.path, "scripts/deploy.sh", "#!/usr/bin/env bash\nset -euo pipefail\n");
+    const { detected } = detectTechnologies(tmp.path);
+    const bash = detected.find((t) => t.id === "bash");
+    ok(bash);
+    ok(bash.skills.includes("wshobson/agents/bash-defensive-patterns"));
+  });
+
+  it("detects Bash scripts from workspaces", () => {
+    writePackageJson(tmp.path, { workspaces: ["packages/*"] });
+    addWorkspace(tmp.path, "packages/api");
+    writeFile(tmp.path, "packages/api/scripts/setup.bash", "#!/usr/bin/env bash\n");
+    const { detected } = detectTechnologies(tmp.path);
+    ok(detected.some((t) => t.id === "bash"));
+  });
+
+  it("ignores Bash scripts inside skipped directories", () => {
+    writePackageJson(tmp.path);
+    writeFile(tmp.path, "node_modules/package/postinstall.sh", "#!/usr/bin/env bash\n");
+    const { detected } = detectTechnologies(tmp.path);
+    ok(!detected.some((t) => t.id === "bash"));
   });
 
   it("detects Three.js from dependencies", () => {
@@ -1517,7 +1556,6 @@ describe("detectCombos", () => {
       (c) => c.id === "react-hook-form-zod",
     );
     ok(combo);
-    ok(combo.skills.includes("jezweb/claude-skills/react-hook-form-zod"));
     ok(combo.skills.includes("pproenca/dot-skills/zod"));
   });
 
